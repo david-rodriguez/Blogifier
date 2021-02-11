@@ -11,18 +11,33 @@ phases:
     commands:
       - echo Restore started on `date`
       - dotnet restore src/Blogifier/Blogifier.csproj
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+      - REPOSITORY_URI=771798557692.dkr.ecr.us-east-1.amazonaws.com/builder-app
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
       
   build:
     commands:
       - echo Build started on `date`
       - dotnet build src/Blogifier/Blogifier.csproj
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
       
   post_build:
     commands:
       - echo Publish started on `date`
       # https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/dotnet-linux-platform-bundle-app.html
       - dotnet publish -c Release -o ./build_output src/Blogifier/Blogifier.csproj
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - printf '[{"name":"builder-app","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       
 artifacts:
   files:
     - build_output/**/*
+    - imagedefinitions.json

@@ -1,0 +1,11 @@
+version: '3.4'
+
+services:
+  blogifier:
+    image: ${DOCKER_REGISTRY-}blogifier
+    build:
+      context: .
+      dockerfile: src/Blogifier/Dockerfile
+    ports:
+      - 80:80
+      - 1433:1433
